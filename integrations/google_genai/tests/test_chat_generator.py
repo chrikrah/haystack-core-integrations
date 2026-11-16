@@ -531,6 +531,19 @@ class TestGoogleGenAIChatGeneratorRun:
         assert len(config.safety_settings) == 1
         assert config.safety_settings[0].category == "HARM_CATEGORY_HARASSMENT"
 
+    def test_run_with_empty_safety_settings_override(self, mock_response):
+        # an empty runtime list must drop the init safety settings for this call, not fall back to them
+        safety = [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"}]
+        component = GoogleGenAIChatGenerator(safety_settings=safety, generation_kwargs={"temperature": 0.5})
+        component._client = MagicMock()
+        component._client.models.generate_content = Mock(return_value=mock_response)
+
+        component.run([ChatMessage.from_user("Hello")])
+        assert component._client.models.generate_content.call_args.kwargs["config"].safety_settings is not None
+
+        component.run([ChatMessage.from_user("Hello")], safety_settings=[])
+        assert component._client.models.generate_content.call_args.kwargs["config"].safety_settings is None
+
     def test_run_with_generation_kwargs(self, mock_response):
         component = GoogleGenAIChatGenerator(generation_kwargs={"temperature": 0.5, "max_output_tokens": 100})
         component._client = MagicMock()
@@ -652,6 +665,19 @@ class TestGoogleGenAIChatGeneratorRun:
 
         await component.run_async([ChatMessage.from_user("Weather in Paris?")], tools=[])
         assert component._async_client.models.generate_content.call_args.kwargs["config"].tools is None
+
+    @pytest.mark.asyncio
+    async def test_run_async_with_empty_safety_settings_override(self, mock_response):
+        safety = [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"}]
+        component = GoogleGenAIChatGenerator(safety_settings=safety, generation_kwargs={"temperature": 0.5})
+        component._async_client = MagicMock()
+        component._async_client.models.generate_content = AsyncMock(return_value=mock_response)
+
+        await component.run_async([ChatMessage.from_user("Hello")])
+        assert component._async_client.models.generate_content.call_args.kwargs["config"].safety_settings is not None
+
+        await component.run_async([ChatMessage.from_user("Hello")], safety_settings=[])
+        assert component._async_client.models.generate_content.call_args.kwargs["config"].safety_settings is None
 
     @pytest.mark.asyncio
     async def test_run_async_streaming(self, mock_streaming_chunk):
